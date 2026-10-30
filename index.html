@@ -72,7 +72,7 @@
 
   <section class="settings" id="settings">
     <h2>Налаштування донат-бару</h2>
-    <p>Встав посилання віджета Donatello (його ж можна без /preview).</p>
+    <p>Встав посилання віджета Donatello.</p>
     <label for="url">Посилання на віджет Donatello</label>
     <input id="url" type="text" placeholder="https://donatello.to/widget/…/token/…" autocomplete="off">
     <label for="title2">Свій заголовок (необов’язково)</label>
@@ -111,17 +111,32 @@
     return u.replace(/\/(preview|info)$/, '');
   }
 
-  function render(d, cfg) {
+  function findGoalData(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    if ('goalAmount' in obj || 'donatedAmount' in obj || 'startAmount' in obj) return obj;
+    for (const key of Object.keys(obj)) {
+      if (typeof obj[key] === 'object') {
+        const found = findGoalData(obj[key]);
+        if (found) return found;
+      }
+    }
+    return obj;
+  }
+
+  function render(data, cfg) {
+    const d = findGoalData(data) || {};
     const start = parseInt(d.startAmount, 10) || 0;
     const donated = parseInt(d.donatedAmount, 10) || 0;
-    const goal = parseInt(d.goalAmount, 10) || 1;
+    const goal = parseInt(d.goalAmount, 10) || 5000;
     const got = start + donated;
-    const pct = Math.min(100, got * 100 / goal);
-    const cur = d.showCurrencySign === false ? '' : (' ' + (SIGN[d.widgetCurrency] || d.widgetCurrency || ''));
-    $('title').textContent = (cfg.donateTitle || d.widgetName || d.widgetLabel || 'Донати');
+    const pct = goal > 0 ? Math.min(100, got * 100 / goal) : 0;
+    const cur = d.showCurrencySign === false ? '' : (' ' + (SIGN[d.widgetCurrency] || d.widgetCurrency || '₴'));
+    
+    $('title').textContent = (cfg.donateTitle || d.widgetName || d.widgetLabel || 'Призовий фонд');
     $('sum').textContent = fmt(got) + cur + ' / ' + fmt(goal) + cur;
     $('pct').textContent = (pct >= 100 ? 100 : pct.toFixed(pct < 10 ? 1 : 0)) + '%';
     $('fill').style.width = pct + '%';
+    
     if (prev !== null && got > prev) {
       const f = $('fill'); f.classList.remove('pop'); void f.offsetWidth; f.classList.add('pop');
       const p = document.createElement('div'); p.className = 'plus'; p.textContent = '+' + fmt(got - prev) + cur;
@@ -136,14 +151,19 @@
     if (!base) { dbg('Двічі клікни по панелі та встав посилання на віджет Donatello'); return; }
     let delay = clamp(cfg.donateInterval, 2, 60, DEF.i) * 1000;
     try {
-      let res;
-      try { res = await fetch(base + '/info', { cache: 'no-store' }); }
-      catch (e) { throw new Error('мережевий збій або Donatello не дозволяє запит із цієї сторінки (CORS)'); }
+      let res, targetUrl = base + '/info';
+      try { 
+        res = await fetch(targetUrl, { cache: 'no-store' }); 
+      } catch (e) { 
+        // Якщо прямий запит упав, пробуємо через резервний проксі
+        res = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl), { cache: 'no-store' });
+      }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const d = await res.json();
       if (g !== gen) return;
       render(d, cfg);
-      dbg('Підключено: зібрано ' + ((parseInt(d.startAmount, 10) || 0) + (parseInt(d.donatedAmount, 10) || 0)) + ' із ' + d.goalAmount);
+      const dataObj = findGoalData(d) || {};
+      dbg('Підключено: зібрано ' + ((parseInt(dataObj.startAmount, 10) || 0) + (parseInt(dataObj.donatedAmount, 10) || 0)) + ' із ' + (dataObj.goalAmount || 5000));
     } catch (e) {
       if (g !== gen) return;
       dbg('Помилка: ' + String(e.message || e));
@@ -151,6 +171,7 @@
     }
     if (g === gen) timer = setTimeout(poll, delay);
   }
+
   function connect() { gen++; prev = null; poll(); }
 
   function syncInt(from) { const v = clamp($(from).value, 2, 60, DEF.i); $('iRange').value = v; if (from === 'iRange') $('iNum').value = v; }
