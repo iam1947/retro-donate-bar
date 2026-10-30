@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retro Donate Bar — Donatello</title>
+<style>
+  :root { --line: rgba(87,255,196,.55); --accent: #57ffc4; --gold: #ffca6a; --text: #f1f6f7; --muted: #9aabb4; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; font-family: "Segoe UI", Arial, sans-serif; color: var(--text); }
+  .panel {
+    position: absolute; left: 24px; top: 18px; width: 560px; height: 92px; max-width: calc(100% - 48px);
+    display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 10px 18px;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: linear-gradient(100deg, rgba(8,14,21,.96), rgba(15,25,34,.92) 50%, rgba(8,14,21,.96));
+    box-shadow: 0 5px 24px rgba(0,0,0,.34), inset 0 0 22px rgba(87,255,196,.035); backdrop-filter: blur(8px);
+  }
+  .panel.rainbow { border-color: transparent; }
+  .panel.rainbow::before {
+    content: ''; position: absolute; inset: -1px; padding: 2px; border-radius: inherit; pointer-events: none;
+    background: linear-gradient(90deg,#ff4e68,#ffca6a,#57ffc4,#5aa8ff,#b58cff,#ff4e68,#ffca6a,#57ffc4,#5aa8ff,#b58cff,#ff4e68);
+    background-size: 200% 100%;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; animation: rainbowFlow 5s linear infinite;
+  }
+  @keyframes rainbowFlow { to { background-position: 100% 0; } }
+  .top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .icon { width: 30px; height: 30px; flex: 0 0 30px; }
+  .icon svg { width: 100%; height: 100%; display: block; }
+  .title { flex: 1; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pct { color: var(--gold); font-size: 22px; font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .track { position: relative; flex: 0 0 auto; height: 30px; border-radius: 8px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); overflow: hidden; }
+  .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #2fd9a4, var(--accent)); box-shadow: 0 0 14px rgba(87,255,196,.55); transition: width 1.2s cubic-bezier(.2,.8,.2,1); }
+  .fill.pop { animation: pop .9s ease-out; }
+  @keyframes pop { 0% { filter: brightness(1.9); } 100% { filter: none; } }
+  .sum { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 850; letter-spacing: .4px; font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px rgba(0,0,0,.9); white-space: nowrap; }
+  .plus { position: absolute; right: 18px; top: -4px; color: var(--gold); font-size: 22px; font-weight: 900; text-shadow: 0 2px 8px #000; pointer-events: none; animation: plusUp 3.2s ease-out forwards; }
+  @keyframes plusUp { 0% { opacity: 0; transform: translateY(14px); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateY(-26px); } }
+  .settings {
+    display:none; position:absolute; left:24px; top:18px; width:350px; max-width:calc(100% - 32px);
+    padding:18px; border:1px solid var(--line); border-radius:12px; background:#0d141c; color:var(--text);
+    box-shadow:0 12px 40px #0009; font-size:13px; z-index:5; max-height:calc(100vh - 36px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:#344653 transparent;
+  }
+  .settings.open { display:block; }
+  .settings h2 { margin:0 0 8px; font-size:17px; }
+  .settings p { color:var(--muted); line-height:1.45; }
+  .settings label { display:block; margin:12px 0 5px; color:#cbd7dc; }
+  .settings label.check { display:flex; align-items:center; gap:8px; }
+  .settings input { width:100%; padding:9px 10px; border:1px solid #344653; border-radius:6px; background:#080d12; color:#fff; outline:none; }
+  .settings input[type=checkbox] { width:auto; margin:0; }
+  .settings .row { display:flex; align-items:center; gap:10px; }
+  .settings .row input[type=range] { flex:1; width:auto; padding:0; }
+  .settings .row input[type=number] { flex:0 0 84px; width:84px; }
+  .settings button { margin-top:12px; padding:9px 12px; border:0; border-radius:6px; background:var(--accent); color:#06120e; font-weight:800; cursor:pointer; }
+  .settings button.secondary { margin-left:6px; background:#25333e; color:#fff; }
+  .settings small { display:block; margin-top:10px; color:#8fa1ac; line-height:1.45; word-break:break-word; }
+  .settings small.dbg { margin-top:0; padding:8px 10px; border:1px solid #344653; border-radius:6px; background:#080d12; color:#cbd7dc; }
+</style>
+</head>
+<body>
+  <div class="panel" id="panel" title="Двічі клікни, щоб відкрити налаштування">
+    <div class="top">
+      <span class="icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="18" stroke="#ffca6a" stroke-width="3.4"/><path d="M29.5 17.5c-1.200-1.400-3.100-2.200-5.500-2.200-3.100 0-5.200 1.500-5.200 3.700 0 5.500 11 2.500 11 8.200 0 2.300-2.200 4-5.600 4-2.700 0-4.900-.9-6.200-2.600M24 11.500v4M24 32.500v4" stroke="#ffca6a" stroke-width="3.2" stroke-linecap="round"/></svg></span>
+      <div class="title" id="title">Донати</div>
+      <div class="pct" id="pct">0%</div>
+    </div>
+    <div class="track" id="track">
+      <div class="fill" id="fill"></div>
+      <div class="sum" id="sum">— / —</div>
+    </div>
+  </div>
+
+  <section class="settings" id="settings">
+    <h2>Налаштування донат-бару</h2>
+    <p>Встав посилання віджета Donatello (його ж можна без /preview).</p>
+    <label for="url">Посилання на віджет Donatello</label>
+    <input id="url" type="text" placeholder="https://donatello.to/widget/…/token/…" autocomplete="off">
+    <label for="title2">Свій заголовок (необов’язково)</label>
+    <input id="title2" type="text" placeholder="Беру з Donatello" autocomplete="off">
+    <label for="iNum">Оновлення, секунд</label>
+    <div class="row"><input type="range" id="iRange" min="2" max="60" step="1"><input type="number" id="iNum" min="2" max="60"></div>
+    <label for="wNum">Ширина панелі, px</label>
+    <div class="row"><input type="range" id="wRange" min="240" max="1200" step="1"><input type="number" id="wNum" min="240" max="1600"></div>
+    <label for="hNum">Висота панелі, px</label>
+    <div class="row"><input type="range" id="hRange" min="60" max="240" step="1"><input type="number" id="hNum" min="60" max="400"></div>
+    <label class="check"><input type="checkbox" id="glowInput"> Обводка, що переливається</label>
+    <button id="save">Зберегти та підключити</button><button class="secondary" id="close">Закрити</button>
+    <small>Посилання містить секретний токен — не показуй це вікно глядачам.</small>
+    <label>Налагодження</label>
+    <small class="dbg" id="debug">—</small>
+  </section>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const KEY = 'retroOverlayConfig', settings = $('settings'), panel = $('panel');
+  const SIGN = { UAH: '₴', USD: '$', EUR: '€', USDT: 'USDT' };
+  const DEF = { w: 560, h: 92, i: 5 };
+  let timer = null, gen = 0, prev = null;
+
+  const readConfig = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (_) { return {}; } };
+  const clamp = (v, min, max, d) => { v = Math.round(Number(v)); return (!isFinite(v) || v <= 0) ? d : Math.min(max, Math.max(min, v)); };
+  const dbg = t => { $('debug').textContent = new Date().toLocaleTimeString('uk-UA') + ' — ' + t; };
+  const fmt = n => Number(n).toLocaleString('uk-UA');
+  const sizeFrom = c => ({ w: clamp(c.donateWidth, 240, 1600, DEF.w), h: clamp(c.donateHeight, 60, 400, DEF.h) });
+  const applySize = (w, h) => { panel.style.width = w + 'px'; panel.style.height = h + 'px'; };
+  const applyGlow = on => panel.classList.toggle('rainbow', !!on);
+
+  function baseUrl(u) {
+    u = String(u || '').trim().split('?')[0].split('#')[0].replace(/\/+$/, '');
+    return u.replace(/\/(preview|info)$/, '');
+  }
+
+  function render(d, cfg) {
+    const start = parseInt(d.startAmount, 10) || 0;
+    const donated = parseInt(d.donatedAmount, 10) || 0;
+    const goal = parseInt(d.goalAmount, 10) || 1;
+    const got = start + donated;
+    const pct = Math.min(100, got * 100 / goal);
+    const cur = d.showCurrencySign === false ? '' : (' ' + (SIGN[d.widgetCurrency] || d.widgetCurrency || ''));
+    $('title').textContent = (cfg.donateTitle || d.widgetName || d.widgetLabel || 'Донати');
+    $('sum').textContent = fmt(got) + cur + ' / ' + fmt(goal) + cur;
+    $('pct').textContent = (pct >= 100 ? 100 : pct.toFixed(pct < 10 ? 1 : 0)) + '%';
+    $('fill').style.width = pct + '%';
+    if (prev !== null && got > prev) {
+      const f = $('fill'); f.classList.remove('pop'); void f.offsetWidth; f.classList.add('pop');
+      const p = document.createElement('div'); p.className = 'plus'; p.textContent = '+' + fmt(got - prev) + cur;
+      $('track').appendChild(p); setTimeout(() => p.remove(), 3300);
+    }
+    prev = got;
+  }
+
+  async function poll() {
+    clearTimeout(timer);
+    const g = gen, cfg = readConfig(), base = baseUrl(cfg.donateUrl);
+    if (!base) { dbg('Двічі клікни по панелі та встав посилання на віджет Donatello'); return; }
+    let delay = clamp(cfg.donateInterval, 2, 60, DEF.i) * 1000;
+    try {
+      let res;
+      try { res = await fetch(base + '/info', { cache: 'no-store' }); }
+      catch (e) { throw new Error('мережевий збій або Donatello не дозволяє запит із цієї сторінки (CORS)'); }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      if (g !== gen) return;
+      render(d, cfg);
+      dbg('Підключено: зібрано ' + ((parseInt(d.startAmount, 10) || 0) + (parseInt(d.donatedAmount, 10) || 0)) + ' із ' + d.goalAmount);
+    } catch (e) {
+      if (g !== gen) return;
+      dbg('Помилка: ' + String(e.message || e));
+      delay = Math.max(delay, 15000);
+    }
+    if (g === gen) timer = setTimeout(poll, delay);
+  }
+  function connect() { gen++; prev = null; poll(); }
+
+  function syncInt(from) { const v = clamp($(from).value, 2, 60, DEF.i); $('iRange').value = v; if (from === 'iRange') $('iNum').value = v; }
+  function liveSize(src) {
+    const w = clamp($(src === 'r' ? 'wRange' : 'wNum').value, 240, 1600, DEF.w);
+    const h = clamp($(src === 'r' ? 'hRange' : 'hNum').value, 60, 400, DEF.h);
+    $('wRange').value = w; $('hRange').value = h;
+    if (src !== 'n') { $('wNum').value = w; $('hNum').value = h; }
+    applySize(w, h);
+  }
+  function openSettings() {
+    const c = readConfig(), z = sizeFrom(c), i = clamp(c.donateInterval, 2, 60, DEF.i);
+    $('url').value = c.donateUrl || ''; $('title2').value = c.donateTitle || '';
+    $('iRange').value = i; $('iNum').value = i;
+    $('wRange').value = z.w; $('wNum').value = z.w; $('hRange').value = z.h; $('hNum').value = z.h;
+    $('glowInput').checked = !!c.donateGlow;
+    settings.classList.add('open');
+  }
+  function closeSettings() { settings.classList.remove('open'); const z = sizeFrom(readConfig()); applySize(z.w, z.h); }
+  function saveConfig() {
+    const cfg = Object.assign(readConfig(), {
+      donateUrl: $('url').value.trim(), donateTitle: $('title2').value.trim(),
+      donateInterval: clamp($('iNum').value, 2, 60, DEF.i),
+      donateWidth: clamp($('wNum').value, 240, 1600, DEF.w), donateHeight: clamp($('hNum').value, 60, 400, DEF.h),
+      donateGlow: $('glowInput').checked
+    });
+    localStorage.setItem(KEY, JSON.stringify(cfg));
+    applyGlow(cfg.donateGlow); const z = sizeFrom(cfg); applySize(z.w, z.h);
+    settings.classList.remove('open');
+    connect();
+  }
+
+  panel.addEventListener('dblclick', openSettings);
+  $('save').addEventListener('click', saveConfig);
+  $('close').addEventListener('click', closeSettings);
+  ['iRange', 'iNum'].forEach(id => $(id).addEventListener('input', () => syncInt(id)));
+  ['wRange', 'hRange'].forEach(id => $(id).addEventListener('input', () => liveSize('r')));
+  ['wNum', 'hNum'].forEach(id => { $(id).addEventListener('input', () => liveSize('n')); $(id).addEventListener('change', () => liveSize('c')); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSettings(); });
+  const c0 = readConfig(); applyGlow(c0.donateGlow); { const z = sizeFrom(c0); applySize(z.w, z.h); }
+  connect();
+})();
+</script>
+</body>
+</html>
